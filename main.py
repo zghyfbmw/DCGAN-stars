@@ -60,7 +60,7 @@ discriminator.add(LeakyReLU(0.2))
 discriminator.add(Flatten())
 discriminator.add(Dense(256))
 discriminator.add(LeakyReLU(0.2))
-discriminator.add(Dropout(0.5))  # Dropout could be added more than once?   avoid overfitting
+discriminator.add(Dropout(0.5))  # Dropout to avoid overfitting
 discriminator.add(Dense(2, activation='softmax'))
 
 discriminator.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0002, beta_1=0.8))

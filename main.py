@@ -140,7 +140,7 @@ cmap = sns.cubehelix_palette(light=1, as_cmap=True)
 plt.figure(figsize=(10, 10))
 for i in range(25):
     plt.subplot(5, 5, i + 1)
-    img = 255 * generated_images[i, 0, 0, 0]
+    img = 255 * generated_images[i, 2, :, :]
     plt.imshow(img, cmap=cmap)
     plt.axis('off')
 plt.tight_layout()

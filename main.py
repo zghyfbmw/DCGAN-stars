@@ -8,13 +8,15 @@ from keras.models import Sequential, Model
 from keras.optimizers import Adam
 from keras.layers.advanced_activations import LeakyReLU
 
+#import matplotlib as mpl
+#import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 X_train = np.load('/Users/zhangguanghua/Desktop/Stampede/training_images.90k.npy')
 X_train = X_train[:, :, 8:-8, 8:-8]
 
-idx = np.unique(np.where(np.min(X_train, axis=(1, 2, 3)) < 25)[0])         # what's this mean?
+idx = np.unique(np.where(np.min(X_train, axis=(1, 2, 3)) < 21.5)[0])
 X_train = X_train[idx]
 
 X_train = (X_train - X_train.min()) / (X_train.max() - X_train.min())
@@ -46,7 +48,7 @@ generator.add(Activation('relu'))
 generator.add(Convolution2D(5, 5, 5, border_mode='same', dim_ordering='th'))
 generator.add(Activation('sigmoid'))
 
-generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.0002, beta_1=0.8))
+generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.0003, beta_1=0.8))
 generator.summary()
 
 # discriminative model
@@ -63,7 +65,7 @@ discriminator.add(LeakyReLU(0.2))
 discriminator.add(Dropout(0.5))  # Dropout to avoid overfitting
 discriminator.add(Dense(2, activation='softmax'))
 
-discriminator.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0002, beta_1=0.8))
+discriminator.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0003, beta_1=0.8))
 discriminator.summary()
 
 # GAN model
@@ -72,17 +74,17 @@ gan_input = Input(shape=(100,))
 gan_output = discriminator(generator(gan_input))
 gan_model = Model(gan_input, gan_output)
 
-gan_model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0002, beta_1=0.8))
+gan_model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0003, beta_1=0.8))
 gan_model.summary()
 
 print("Pre-training generator...")
-noise_gen = np.random.uniform(0, 1, size=(45000, 100))   # at (0,1) creates 45000 points
+noise_gen = np.random.uniform(0, 1, size=(15000, 100))   # at (0,1) creates 5000 points
 generated_images = generator.predict(noise_gen)
 
-X = np.concatenate((X_train[:45000, :, :, :], generated_images))
-y = np.zeros([90000, 2])
-y[:45000, 1] = 1
-y[45000:, 0] = 1
+X = np.concatenate((X_train[:15000, :, :, :], generated_images))
+y = np.zeros([30000, 2])
+y[:15000, 1] = 1
+y[15000:, 0] = 1
 
 discriminator.fit(X, y, nb_epoch=1, batch_size=128)
 
@@ -92,7 +94,7 @@ y_hat = discriminator.predict(X)
 losses = {"d": [], "g": []}
 
 
-def train_for_n(nb_epoch=90000, batch_size=128):
+def train_for_n(nb_epoch=30000, batch_size=128):
     for e in range(nb_epoch):
 
         # Make generative images
@@ -128,20 +130,46 @@ def train_for_n(nb_epoch=90000, batch_size=128):
             discriminator.save_weights('discriminator.h5')
             noise = np.random.uniform(0, 1, size=(100, 100))
             generated_images = generator.predict(noise)
-            np.save('generated_images.npy', generated_images)
-            np.save('/Users/zhangguanghua/Desktop/Stampede/', generated_images)
+            np.save('r_generated_images.npy', generated_images)
 
         print("Iteration: {0} / {1}, Loss: {2:.4f}".format(e, nb_epoch, float(g_loss)))
 
+# print original images
 
-# print generated images
 cmap = sns.cubehelix_palette(light=1, as_cmap=True)
 
-plt.figure(figsize=(10, 10))
+def normalize(array):
+    return (array - array.min()) / (array.max() - array.min())
+
+for i in range(4):
+    X_train[:, i, :, :] = normalize(X_train[:, i, :, :])
+
+X_train = 1.0 - X_train
+#print(np.min(X_train), np.max(X_train))
+
+print('X_train shape:', X_train.shape)
+print(X_train.shape[0], 'train samples')
+
+plt.figure(1, figsize=(10, 10))
 for i in range(25):
     plt.subplot(5, 5, i + 1)
-    img = 255 * generated_images[i, 2, :, :]
+    img = 255 * X_train[i, 1, :, :]
     plt.imshow(img, cmap=cmap)
+    plt.axis('off')
+plt.tight_layout()
+plt.show()
+
+
+# print generated images
+
+
+
+
+plt.figure(2, figsize= (10, 10))
+for i in range(25):
+    plt.subplot(5, 5, i + 1)
+    img = 255 * (generated_images[i, 1, :, :])
+    plt.imshow(img)
     plt.axis('off')
 plt.tight_layout()
 plt.show()

@@ -8,13 +8,9 @@ from keras.models import Sequential, Model
 from keras.optimizers import Adam
 from keras.layers.advanced_activations import LeakyReLU
 
-#import matplotlib as mpl
-#import matplotlib.colors as colors
-import matplotlib.pyplot as plt
-import seaborn as sns
 
-X_train = np.load('/Users/zhangguanghua/Desktop/Stampede/training_images.90k.npy')
-X_train = X_train[:, :, 8:-8, 8:-8]
+X_train = np.load('/work/04489/zghyfbmw/training_images.90k.npy')
+X_train = X_train[:, 1:4, 8:-8, 8:-8]
 
 idx = np.unique(np.where(np.min(X_train, axis=(1, 2, 3)) < 21.5)[0])
 X_train = X_train[idx]
@@ -45,10 +41,10 @@ generator.add(UpSampling2D(size=(2, 2), dim_ordering='th'))
 generator.add(Convolution2D(64, 5, 5, border_mode='same', dim_ordering='th'))
 generator.add(BatchNormalization(mode=2))
 generator.add(Activation('relu'))
-generator.add(Convolution2D(5, 5, 5, border_mode='same', dim_ordering='th'))
+generator.add(Convolution2D(3, 5, 5, border_mode='same', dim_ordering='th'))
 generator.add(Activation('sigmoid'))
 
-generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.0003, beta_1=0.8))
+generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.0001, beta_1=0.5))
 generator.summary()
 
 # discriminative model
@@ -63,9 +59,9 @@ discriminator.add(Flatten())
 discriminator.add(Dense(256))
 discriminator.add(LeakyReLU(0.2))
 discriminator.add(Dropout(0.5))  # Dropout to avoid overfitting
-discriminator.add(Dense(2, activation='softmax'))
+discriminator.add(Dense(2, activation='softmax'))   # classify into two classes"1","0"
 
-discriminator.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0003, beta_1=0.8))
+discriminator.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0001, beta_1=0.5))
 discriminator.summary()
 
 # GAN model
@@ -74,31 +70,30 @@ gan_input = Input(shape=(100,))
 gan_output = discriminator(generator(gan_input))
 gan_model = Model(gan_input, gan_output)
 
-gan_model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0003, beta_1=0.8))
+gan_model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0001, beta_1=0.5))
 gan_model.summary()
 
 print("Pre-training generator...")
-noise_gen = np.random.uniform(0, 1, size=(15000, 100))   # at (0,1) creates 5000 points
+noise_gen = np.random.uniform(0, 1, size=(10000, 100))   # at (0,1) creates 10000 points
 generated_images = generator.predict(noise_gen)
 
-X = np.concatenate((X_train[:15000, :, :, :], generated_images))
-y = np.zeros([30000, 2])
-y[:15000, 1] = 1
-y[15000:, 0] = 1
+X = np.concatenate((X_train[:10000, :, :, :], generated_images))
+y = np.zeros([20000, 2])
+y[:10000, 1] = 1
+y[10000:, 0] = 1
 
 discriminator.fit(X, y, nb_epoch=1, batch_size=128)
-
 y_hat = discriminator.predict(X)
 
 # set up loss storage vector
 losses = {"d": [], "g": []}
 
 
-def train_for_n(nb_epoch=30000, batch_size=128):
+def train_for_n(nb_epoch=20000, batch_size=128):
     for e in range(nb_epoch):
 
         # Make generative images
-        train_idx = np.random.randint(0, X_train.shape[0], size=batch_size)
+        train_idx = np.random.randint(0, X_train.shape[0], size=batch_size)  # 0 <= train_idx <= X_train.shape[0]
         mini_batch = X_train[train_idx]
         noise_gen = np.random.uniform(0, 1, size=(batch_size, 100))
         generated_images = generator.predict(noise_gen)
@@ -119,7 +114,7 @@ def train_for_n(nb_epoch=30000, batch_size=128):
         y2 = np.zeros([batch_size, 2])
         y2[:, 1] = 1
 
-        discriminator.trainable = False         # why False?
+        discriminator.trainable = False
         for layer in discriminator.layers:
             layer.trainable = False
         g_loss = gan_model.train_on_batch(noise_tr, y2)
@@ -130,46 +125,8 @@ def train_for_n(nb_epoch=30000, batch_size=128):
             discriminator.save_weights('discriminator.h5')
             noise = np.random.uniform(0, 1, size=(100, 100))
             generated_images = generator.predict(noise)
-            np.save('r_generated_images.npy', generated_images)
+            np.save('/work/04489/zghyfbmw/r_generated_images.npy', generated_images)
 
         print("Iteration: {0} / {1}, Loss: {2:.4f}".format(e, nb_epoch, float(g_loss)))
 
-# print original images
-
-cmap = sns.cubehelix_palette(light=1, as_cmap=True)
-
-def normalize(array):
-    return (array - array.min()) / (array.max() - array.min())
-
-for i in range(4):
-    X_train[:, i, :, :] = normalize(X_train[:, i, :, :])
-
-X_train = 1.0 - X_train
-#print(np.min(X_train), np.max(X_train))
-
-print('X_train shape:', X_train.shape)
-print(X_train.shape[0], 'train samples')
-
-plt.figure(1, figsize=(10, 10))
-for i in range(25):
-    plt.subplot(5, 5, i + 1)
-    img = 255 * X_train[i, 1, :, :]
-    plt.imshow(img, cmap=cmap)
-    plt.axis('off')
-plt.tight_layout()
-plt.show()
-
-
-# print generated images
-
-
-
-
-plt.figure(2, figsize= (10, 10))
-for i in range(25):
-    plt.subplot(5, 5, i + 1)
-    img = 255 * (generated_images[i, 1, :, :])
-    plt.imshow(img)
-    plt.axis('off')
-plt.tight_layout()
-plt.show()
+train_for_n(nb_epoch=1000, batch_size=128)

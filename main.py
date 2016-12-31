@@ -9,8 +9,17 @@ from keras.optimizers import Adam
 from keras.layers.advanced_activations import LeakyReLU
 
 
-X_train = np.load('/work/04489/zghyfbmw/training_images.90k.npy')
-X_train = X_train[:, 1:4, 8:-8, 8:-8]
+data1 = np.load('/Users/zhangguanghua/Desktop/Stampede/sdss_cutout.001.npy')
+data2 = np.load('/Users/zhangguanghua/Desktop/Stampede/sdss_cutout.002.npy')
+data3 = np.load('/Users/zhangguanghua/Desktop/Stampede/sdss_cutout.003.npy')
+#data4 = np.load('/Users/zhangguanghua/Desktop/Stampede/sdss_cutout.004.npy')
+
+C1 = np.concatenate([data1, data2])
+
+
+X_train = np.concatenate([C1, data3])
+
+X_train = X_train[:, 1:4, 16:-16, 16:-16]
 
 idx = np.unique(np.where(np.min(X_train, axis=(1, 2, 3)) < 21.5)[0])
 X_train = X_train[idx]
@@ -44,7 +53,7 @@ generator.add(Activation('relu'))
 generator.add(Convolution2D(3, 5, 5, border_mode='same', dim_ordering='th'))
 generator.add(Activation('sigmoid'))
 
-generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.0001, beta_1=0.5))
+generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.000013, beta_1=0.5))
 generator.summary()
 
 # discriminative model
@@ -61,7 +70,7 @@ discriminator.add(LeakyReLU(0.2))
 discriminator.add(Dropout(0.5))  # Dropout to avoid overfitting
 discriminator.add(Dense(2, activation='softmax'))   # classify into two classes"1","0"
 
-discriminator.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0001, beta_1=0.5))
+discriminator.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.000015, beta_1=0.5))
 discriminator.summary()
 
 # GAN model
@@ -70,26 +79,26 @@ gan_input = Input(shape=(100,))
 gan_output = discriminator(generator(gan_input))
 gan_model = Model(gan_input, gan_output)
 
-gan_model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.0001, beta_1=0.5))
+gan_model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.000015, beta_1=0.5))
 gan_model.summary()
 
 print("Pre-training generator...")
-noise_gen = np.random.uniform(0, 1, size=(10000, 100))   # at (0,1) creates 10000 points
+noise_gen = np.random.uniform(0, 1, size=(5000, 100))   # at (0,1) creates 10000 points
 generated_images = generator.predict(noise_gen)
 
-X = np.concatenate((X_train[:10000, :, :, :], generated_images))
-y = np.zeros([20000, 2])
-y[:10000, 1] = 1
-y[10000:, 0] = 1
+X = np.concatenate((X_train[:5000, :, :, :], generated_images))
+y = np.zeros([10000, 2])
+y[:5000, 1] = 1
+y[5000:, 0] = 1
 
-discriminator.fit(X, y, nb_epoch=1, batch_size=128)
+discriminator.fit(X, y, nb_epoch=3, batch_size=128)
 y_hat = discriminator.predict(X)
 
 # set up loss storage vector
 losses = {"d": [], "g": []}
 
 
-def train_for_n(nb_epoch=20000, batch_size=128):
+def train_for_n(nb_epoch=10000, batch_size=128):
     for e in range(nb_epoch):
 
         # Make generative images
@@ -120,13 +129,13 @@ def train_for_n(nb_epoch=20000, batch_size=128):
         g_loss = gan_model.train_on_batch(noise_tr, y2)
         losses["g"].append(g_loss)
 
-        if e % 10 == 9:
+        if e % 100 == 0:
             generator.save_weights('generator.h5')
             discriminator.save_weights('discriminator.h5')
             noise = np.random.uniform(0, 1, size=(100, 100))
             generated_images = generator.predict(noise)
-            np.save('/work/04489/zghyfbmw/r_generated_images.npy', generated_images)
+            np.save('/Users/zhangguanghua/Desktop/Stampede/7_generated_images.npy', generated_images)
 
         print("Iteration: {0} / {1}, Loss: {2:.4f}".format(e, nb_epoch, float(g_loss)))
 
-train_for_n(nb_epoch=1000, batch_size=128)
+train_for_n(nb_epoch=2000, batch_size=128)

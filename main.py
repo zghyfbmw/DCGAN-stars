@@ -16,7 +16,7 @@ print('X_train shape --- ', X_train.shape)
 print(X_train.shape[0], 'train samples')
 
 
-# generative model   conv 3 times
+# generative model  
 
 g_input = Input(shape=(100,))
 

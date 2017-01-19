@@ -5,11 +5,11 @@ from keras.layers.core import Reshape, Dense, Dropout, Activation, Flatten
 from keras.layers.normalization import BatchNormalization
 from keras.layers.convolutional import Convolution2D, UpSampling2D
 from keras.models import Sequential, Model
-from keras.optimizers import Adam
+from keras.optimizers import Adamax
 from keras.layers.advanced_activations import LeakyReLU
 from keras.models import save_model, load_model
 
-X_train = np.load('/Users/zhangguanghua/Desktop/Stampede/T1.npy')
+X_train = np.load('/Users/zhangguanghua/Desktop/Stampede/T2.npy')
 X_train = (X_train - X_train.min()) / (X_train.max() - X_train.min())
 X_train = 1.0 - X_train
 print('X_train shape --- ', X_train.shape)
@@ -39,7 +39,8 @@ generator.add(Activation('relu'))
 generator.add(Convolution2D(3, 5, 5, border_mode='same', dim_ordering='th'))
 generator.add(Activation('sigmoid'))
 
-generator.compile(loss='binary_crossentropy', optimizer=Adam(lr=0.000007, beta_1=0.5))
+generator.compile(loss='binary_crossentropy',
+                  optimizer=Adamax(lr=0.00002, beta_1=0.5, epsilon=1e-08, decay=0.0))
 generator.summary()
 
 # discriminative model
@@ -56,9 +57,10 @@ discriminator.add(Flatten())
 discriminator.add(Dense(512))
 discriminator.add(LeakyReLU(0.2))
 discriminator.add(Dropout(0.5))
-discriminator.add(Dense(2, activation='softmax'))
+discriminator.add(Dense(2))
 
-discriminator.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.000007, beta_1=0.5))
+discriminator.compile(loss='categorical_crossentropy', optimizer=Adamax(lr=0.00002, beta_1=0.5,
+                                                                        epsilon=1e-08, decay=0.0))
 discriminator.summary()
 
 # GAN Model
@@ -66,12 +68,14 @@ gan_input = Input(shape=(100,))
 gan_output = discriminator(generator(gan_input))
 gan_model = Model(gan_input, gan_output)
 
-gan_model.compile(loss='categorical_crossentropy', optimizer=Adam(lr=0.000007, beta_1=0.5))
+gan_model.compile(loss='categorical_crossentropy', optimizer=Adamax(lr=0.00002, beta_1=0.5,
+                                                                    epsilon=1e-08, decay=0.0))
 gan_model.summary()
 
 # Load Model
-generator.load_weights('/Users/zhangguanghua/Desktop/G_weights.h5')
-discriminator.load_weights('/Users/zhangguanghua/Desktop/D_weights.h5')
+generator.load_weights('/Users/zhangguanghua/Desktop/G11_weights.h5')
+discriminator.load_weights('/Users/zhangguanghua/Desktop/D11_weights.h5')
+print("Model Loaded")
 
 print("Pre-training generator...")
 noise_gen = np.random.uniform(0, 1, size=(100000, 100))   # at (0,1) creates 10000 points
@@ -84,14 +88,14 @@ y = np.zeros([200000, 2])
 y[:100000, 1] = 1
 y[100000:, 0] = 1
 
-discriminator.fit(X, y, nb_epoch=1, batch_size=256)
+discriminator.fit(X, y, nb_epoch=1, batch_size=128)
 y_hat = discriminator.predict(X)
 
 # set up loss storage vector
 losses = {"d": [], "g": []}
 
 
-def train_for_n(nb_epoch=200000, batch_size=256):
+def train_for_n(nb_epoch=200000, batch_size=32):
     for e in range(nb_epoch):
 
         # Make generative images
@@ -122,13 +126,13 @@ def train_for_n(nb_epoch=200000, batch_size=256):
         g_loss = gan_model.train_on_batch(noise_tr, y2)
         losses["g"].append(g_loss)
 
-        if e % 100 == 0:
-            generator.save_weights('G1_weights.h5')
-            discriminator.save_weights('D1_weights.h5')
+        if e % 10 == 9:
+            generator.save_weights('G12_weights.h5')
+            discriminator.save_weights('D12_weights.h5')
             noise = np.random.uniform(0, 1, size=(100, 100))
             generated_images = generator.predict(noise)
-            np.save('/Users/zhangguanghua/Desktop/Stampede/generated_images.npy', generated_images)
+            np.save('/Users/zhangguanghua/Desktop/Stampede/generated_images_5.npy', generated_images)
 
         print("Iteration: {0} / {1}, Loss: {2:.4f}".format(e, nb_epoch, float(g_loss)))
 
-train_for_n(nb_epoch=2000, batch_size=256)
+train_for_n(nb_epoch=3000, batch_size=32)
